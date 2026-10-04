@@ -1,0 +1,18 @@
+{
+  "name": "api-lab",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c yellow,green \"npm run dev -w server\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w frontend",
+    "typecheck": "npm run typecheck -w frontend",
+    "start": "npm run start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

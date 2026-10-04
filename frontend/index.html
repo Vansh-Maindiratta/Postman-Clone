@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230d0f12'/><rect x='3' y='4' width='3' height='8' rx='1' fill='%2358a6ff'/><path d='M8 5.5h5M8 10.5h5' stroke='%2358a6ff' stroke-width='1.6' stroke-linecap='round'/></svg>"
+    />
+    <title>API Lab</title>
+    <script>
+      const stored = localStorage.getItem('api-lab.theme');
+      const theme = stored === 'light' || stored === 'dark'
+        ? stored
+        : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.dataset.theme = theme;
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
