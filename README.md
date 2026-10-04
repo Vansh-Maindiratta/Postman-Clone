@@ -31,14 +31,34 @@ The app runs at http://localhost:5173; the optional proxy runs at http://localho
 ```bash
 npm run build      # production build
 npm run typecheck  # TypeScript check
-npm start          # serve the built app + proxy
+npm start          # start the CORS proxy (proxy-only; the frontend is served separately)
 ```
 
 ## Usage
 
 Pick an example request from the left panel or create a new one, fill in the URL, add params/headers/body as needed, and hit **Send** (`Ctrl/Cmd + Enter`). Save requests into collections with `Ctrl/Cmd + S`.
 
-Some APIs block requests made from the browser (CORS). API Lab automatically retries those through the local proxy, so keep `npm run dev` running if you hit a cross-origin API.
+Some APIs block requests made from the browser (CORS). API Lab automatically retries those through the proxy: locally that is the backend started by `npm run dev`, and in production it is the deployed Render backend (`VITE_API_URL`).
+
+## Deployment
+
+The frontend and backend deploy independently.
+
+**Frontend — Vercel**
+
+- Root Directory: `frontend/`
+- Build: `npm run build`
+- Output: `dist`
+- Environment variable: `VITE_API_URL=https://<render-service>`
+
+**Backend — Render**
+
+- Root Directory: `server/`
+- Build: `npm install`
+- Start: `npm start`
+- Environment variable: `CLIENT_URL=https://<vercel-frontend>`
+
+Without `VITE_API_URL` direct requests still work; only the CORS proxy fallback needs the deployed backend. Local defaults (no configuration needed) are `http://localhost:3001` for the proxy and `http://localhost:5173` for the allowed origin — see `.env.example`.
 
 ## Contributing
 

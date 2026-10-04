@@ -5,6 +5,11 @@ export const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELET
 const TIMEOUT_MS = 30_000;
 const BODYLESS_METHODS = new Set<HttpMethod>(['GET', 'HEAD']);
 
+// Base URL of the deployed proxy backend (Render), from the Vite env var.
+// Empty by default: in local development the Vite dev server forwards /proxy
+// to the backend for us, so the relative URL below just works.
+const PROXY_BASE = String(import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
 // Methods the execution layer knows how to send. PUT and PATCH are still on the
 // TODO list — they show up in the selector, but nothing handles them yet.
 const HANDLED_METHODS = new Set<HttpMethod>(['GET', 'POST', 'DELETE', 'HEAD', 'OPTIONS']);
@@ -207,9 +212,17 @@ export async function sendRequest(request: ApiRequest, userSignal?: AbortSignal)
       // The browser blocked the request (usually CORS) or it never left this
       // machine. Retry through the local proxy before giving up.
       try {
-        response = await fetch(`/proxy?url=${encodeURIComponent(url)}`, { ...init, signal });
+        response = await fetch(`${PROXY_BASE}/proxy?url=${encodeURIComponent(url)}`, { ...init, signal });
         if (response.headers.get('x-api-lab-proxy-error')) {
           throw new RequestError('Could not reach the target server.\n\nCheck the URL and the server address.');
+        }
+        // Only a real proxy response may be shown as the target API's response.
+        // Anything without our header (for example a hosting platform's 404
+        // page) means the proxy route does not exist.
+        if (!response.headers.get('x-api-lab-proxy')) {
+          throw new RequestError(
+            'The API Lab proxy is unavailable.\n\nFor local development, start the backend with "npm run dev". In production, check that VITE_API_URL points to the deployed backend.',
+          );
         }
       } catch (proxyError) {
         if (signal.aborted) throw abortError();
