@@ -1,0 +1,17 @@
+# Render Blueprint for the API Lab backend (stateless CORS proxy).
+# The frontend is deployed separately on Vercel — see README.md.
+# Render assigns PORT automatically; only CLIENT_URL is yours to set.
+services:
+  - type: web
+    name: api-lab-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Browser origin allowed to call the proxy: your Vercel frontend URL,
+      # e.g. https://your-frontend.vercel.app (comma-separated for several).
+      - key: CLIENT_URL
+        sync: false

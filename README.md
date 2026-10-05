@@ -13,65 +13,161 @@ A lightweight, browser-based API client for building and testing HTTP requests. 
 - Light and dark themes, keyboard shortcuts, local storage persistence
 - Small CORS proxy for APIs that block browser requests
 
-## Tech Stack
+## Architecture
 
-- React + TypeScript + Vite
-- Express (local CORS proxy only)
-- No UI framework, no state library — plain CSS and React state
+```
+Frontend — React + TypeScript + Vite
+        │
+        ▼  static assets
+     Vercel
+        │
+        │  /proxy (only when a target API blocks the browser with CORS)
+        ▼
+Backend — Node.js + Express (CORS proxy)
+        │
+        ▼
+     Render
 
-## Getting Started
-
-```bash
-npm install
-npm run dev
+Persistence — browser localStorage (NO database)
 ```
 
-The app runs at http://localhost:5173; the optional proxy runs at http://localhost:3001.
+**There is no database.** Collections, history, and theme live in the browser's
+`localStorage`. The backend is a stateless CORS proxy with no accounts, no
+sessions, and no storage — so there is nothing to provision (no MongoDB, no
+SQL, no ORM).
+
+- Frontend: React 19 + TypeScript + Vite 7, plain CSS, no router, no state library
+- Backend: Node.js + Express 5 — one `/proxy` endpoint plus a health check
+- The two apps deploy independently and know each other only through URLs
+
+### Repository structure
+
+```
+.
+├── frontend/            # React + Vite app (Vercel)
+│   ├── src/
+│   ├── package.json
+│   ├── .env.example
+│   ├── index.html
+│   ├── tsconfig.json
+│   └── vite.config.ts
+├── backend/             # Express CORS proxy (Render)
+│   ├── src/server.js
+│   ├── package.json
+│   └── .env.example
+├── render.yaml          # Render Blueprint for the backend
+├── package.json         # npm workspaces + concurrently dev script
+├── README.md
+└── .gitignore
+```
+
+## Local setup
+
+Requires Node.js 22.9+ (the dev script uses `--env-file-if-exists`).
 
 ```bash
-npm run build      # production build
+npm install        # installs both workspaces
+npm run dev        # backend on :3001 + frontend on :5173, via concurrently
+```
+
+Or run each side separately:
+
+```bash
+cd frontend && npm run dev     # Vite dev server at http://localhost:5173
+cd backend  && npm run dev     # proxy at http://localhost:3001
+```
+
+No configuration is needed locally: the Vite dev server forwards `/proxy` to
+the backend for you (see `frontend/vite.config.ts`).
+
+Other scripts:
+
+```bash
+npm run build      # production build of the frontend (tsc + vite)
 npm run typecheck  # TypeScript check
-npm start          # start the CORS proxy (proxy-only; the frontend is served separately)
+npm start          # start the backend with plain node (production-style)
 ```
 
-## Usage
+## Environment variables
 
-Pick an example request from the left panel or create a new one, fill in the URL, add params/headers/body as needed, and hit **Send** (`Ctrl/Cmd + Enter`). Save requests into collections with `Ctrl/Cmd + S`.
+Each workspace has its own `.env` file — copy the example and edit it.
+`.env` files are gitignored; only the `.example` templates are committed.
 
-Some APIs block requests made from the browser (CORS). API Lab automatically retries those through the proxy: locally that is the backend started by `npm run dev`, and in production it is the deployed Render backend (`VITE_API_URL`).
+### `frontend/.env` (build time, PUBLIC — baked into the bundle, no secrets)
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `VITE_API_URL` | production only | Base URL of the deployed backend, e.g. `https://your-backend.onrender.com`. Leave unset locally. |
+
+### `backend/.env` (runtime, backend only)
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `PORT` | no | `3001` | Proxy port. Render sets this automatically — do not set it on Render. |
+| `CLIENT_URL` | production | `http://localhost:5173` | Browser origin(s) allowed to call the proxy (CORS). Comma-separated for several, e.g. `CLIENT_URL=https://your-frontend.vercel.app,https://preview-xyz.vercel.app`. |
 
 ## Deployment
 
 The frontend and backend deploy independently.
 
-**Frontend — Vercel**
+### Frontend — Vercel
 
-- Root Directory: `frontend/`
-- Build: `npm run build`
-- Output: `dist`
-- Environment variable: `VITE_API_URL=https://<render-service>`
+- Root Directory: `frontend`
+- Framework Preset: Vite (auto-detected)
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Environment Variables: `VITE_API_URL=https://<your-render-service>`
 
-**Backend — Render**
+No `vercel.json` is needed: the app is a single page with no client-side
+routes, and Vercel serves the Vite `dist/` output as-is.
 
-- Root Directory: `server/`
-- Build: `npm install`
-- Start: `npm start`
-- Environment variable: `CLIENT_URL=https://<vercel-frontend>`
+### Backend — Render
 
-Without `VITE_API_URL` direct requests still work; only the CORS proxy fallback needs the deployed backend. Local defaults (no configuration needed) are `http://localhost:3001` for the proxy and `http://localhost:5173` for the allowed origin — see `.env.example`.
+Either use the included `render.yaml` Blueprint (repo root), or create a Web
+Service manually:
+
+- Root Directory: `backend`
+- Runtime: Node
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Health Check Path: `/api/health`
+- Environment Variables: `CLIENT_URL=https://<your-vercel-frontend>`
+
+The server binds to `0.0.0.0` and reads `PORT` from the environment, as
+container platforms require. `GET /api/health` returns `{"status":"ok"}`.
+
+Without `VITE_API_URL`, direct requests still work in the deployed frontend;
+only the CORS-proxy fallback needs the deployed backend. Local defaults need
+no configuration — see `frontend/.env.example` and `backend/.env.example`.
+
+## Usage
+
+Pick an example request from the left panel or create a new one, fill in the URL,
+add params/headers/body as needed, and hit **Send** (`Ctrl/Cmd + Enter`). Save
+requests into collections with `Ctrl/Cmd + S`.
+
+Some APIs block requests made from the browser (CORS). API Lab automatically
+retries those through the proxy: locally that is the backend started by
+`npm run dev`, and in production it is the deployed Render backend
+(`VITE_API_URL`).
 
 ## Contributing
 
 ### Issue 1 — PUT and PATCH are not implemented
 
-PUT and PATCH appear in the method selector and can be saved into collections, but the request execution layer does not handle them: sending one fails with *"not implemented yet"*. The fix is small and a good first contribution.
+PUT and PATCH appear in the method selector and can be saved into collections,
+but the request execution layer does not handle them: sending one fails with
+*"not implemented yet"*. The fix is small and a good first contribution.
 
 - Look at `HANDLED_METHODS` in `frontend/src/services/request.ts`.
 - The UI and saved state already support these methods — only the send path is missing.
 
 ### Issue 2 — GET and DELETE are swapped
 
-A GET request executes DELETE behavior, and a DELETE request executes GET behavior. The selector keeps showing the method you chose, so the symptom only appears in the response (for example, a GET to `https://httpbin.org/get` returns `405 Method Not Allowed`, because a DELETE actually went out).
+A GET request executes DELETE behavior, and a DELETE request executes GET
+behavior. The selector keeps showing the method you chose, so the symptom only
+appears in the response (for example, a GET to `https://httpbin.org/get` returns
+`405 Method Not Allowed`, because a DELETE actually went out).
 
 - Look at `swapMethod` in `frontend/src/services/request.ts`.
 - Remove or fix the swap so the selected method reaches the network unchanged.
@@ -79,6 +175,8 @@ A GET request executes DELETE behavior, and a DELETE request executes GET behavi
 ### Where to look
 
 - `frontend/src/services/request.ts` — `sendRequest`, `HANDLED_METHODS`, `swapMethod`, `HTTP_METHODS`.
-- `server/src/server.js` — `/proxy` endpoint (CORS fallback for APIs that block browser requests).
+- `backend/src/server.js` — `/proxy` endpoint (CORS fallback for APIs that block browser requests).
 
-Good first contributions: fix the GET/DELETE swap, implement PUT/PATCH, improve response viewer details, polish empty states, add keyboard shortcuts, improve accessibility, improve the mobile collection panel.
+Good first contributions: fix the GET/DELETE swap, implement PUT/PATCH, improve
+response viewer details, polish empty states, add keyboard shortcuts, improve
+accessibility, improve the mobile collection panel.

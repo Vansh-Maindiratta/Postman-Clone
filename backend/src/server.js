@@ -5,9 +5,13 @@ import { isIPv4, isIPv6 } from 'node:net';
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
-// Browser origin allowed to call the proxy: the local Vite server by default,
-// the deployed Vercel frontend in production (CLIENT_URL).
-const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+// Browser origins allowed to call the proxy: the local Vite dev server by
+// default, the deployed Vercel frontend in production (CLIENT_URL). Multiple
+// origins can be comma-separated. Not a secret — CLIENT_URL is CORS config.
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 const UPSTREAM_TIMEOUT_MS = 30_000;
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
@@ -15,10 +19,16 @@ const MAX_BODY_BYTES = 10 * 1024 * 1024;
 app.disable('x-powered-by');
 
 // CORS so the frontend, which is a different origin in production, can use the
-// proxy. Preflights are answered here; a plain OPTIONS request (the user picked
+// proxy. The caller's origin is echoed back only when it is on the allow list;
+// anything else gets no allow-origin header and the browser blocks the call.
+// No cookies/credentials are involved, so no allow-credentials header is set.
+// Preflights are answered here; a plain OPTIONS request (the user picked
 // OPTIONS as the request method) is still forwarded to the target.
 app.use((req, res, next) => {
-  res.setHeader('access-control-allow-origin', clientUrl);
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin.replace(/\/+$/, '') : '';
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('access-control-allow-origin', origin);
+  }
   res.setHeader('vary', 'Origin');
   res.setHeader('access-control-allow-methods', 'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
   res.setHeader(
@@ -36,7 +46,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check. The React app is built and served separately (Vercel).
+// Health check for Render uptime monitors and deployment verification.
+// The React app is built and served separately (Vercel).
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.get('/', (req, res) => {
   res.type('text/plain').send('API Lab proxy is running.');
 });
@@ -173,6 +188,14 @@ app.all('/proxy', async (req, res) => {
   res.end(body.length > 0 ? body : undefined);
 });
 
-app.listen(port, () => {
-  console.log(`API Lab proxy listening on http://localhost:${port}`);
+// Fail loudly instead of limping on in an unknown state; the platform
+// (Render) restarts the process.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
+  process.exit(1);
+});
+
+// Bind to all interfaces so container platforms (Render) can reach the port.
+app.listen(port, '0.0.0.0', () => {
+  console.log(`API Lab proxy listening on port ${port}`);
 });
