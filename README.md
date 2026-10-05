@@ -15,7 +15,7 @@ A lightweight, browser-based API client for building and testing HTTP requests. 
 
 ## Architecture
 
-```
+
 Frontend — React + TypeScript + Vite
         │
         ▼  static assets
@@ -28,13 +28,6 @@ Backend — Node.js + Express (CORS proxy)
         ▼
      Render
 
-Persistence — browser localStorage (NO database)
-```
-
-**There is no database.** Collections, history, and theme live in the browser's
-`localStorage`. The backend is a stateless CORS proxy with no accounts, no
-sessions, and no storage — so there is nothing to provision (no MongoDB, no
-SQL, no ORM).
 
 - Frontend: React 19 + TypeScript + Vite 7, plain CSS, no router, no state library
 - Backend: Node.js + Express 5 — one `/proxy` endpoint plus a health check
@@ -42,7 +35,6 @@ SQL, no ORM).
 
 ### Repository structure
 
-```
 .
 ├── frontend/            # React + Vite app (Vercel)
 │   ├── src/
@@ -73,9 +65,8 @@ npm run dev        # backend on :3001 + frontend on :5173, via concurrently
 Or run each side separately:
 
 ```bash
-cd frontend && npm run dev     # Vite dev server at http://localhost:5173
-cd backend  && npm run dev     # proxy at http://localhost:3001
-```
+cd frontend && npm run dev 
+cd backend  && npm run dev   
 
 No configuration is needed locally: the Vite dev server forwards `/proxy` to
 the backend for you (see `frontend/vite.config.ts`).
@@ -83,9 +74,9 @@ the backend for you (see `frontend/vite.config.ts`).
 Other scripts:
 
 ```bash
-npm run build      # production build of the frontend (tsc + vite)
-npm run typecheck  # TypeScript check
-npm start          # start the backend with plain node (production-style)
+npm run build      
+npm run typecheck  
+npm start          
 ```
 
 ## Environment variables
@@ -139,17 +130,6 @@ container platforms require. `GET /api/health` returns `{"status":"ok"}`.
 Without `VITE_API_URL`, direct requests still work in the deployed frontend;
 only the CORS-proxy fallback needs the deployed backend. Local defaults need
 no configuration — see `frontend/.env.example` and `backend/.env.example`.
-
-## Usage
-
-Pick an example request from the left panel or create a new one, fill in the URL,
-add params/headers/body as needed, and hit **Send** (`Ctrl/Cmd + Enter`). Save
-requests into collections with `Ctrl/Cmd + S`.
-
-Some APIs block requests made from the browser (CORS). API Lab automatically
-retries those through the proxy: locally that is the backend started by
-`npm run dev`, and in production it is the deployed Render backend
-(`VITE_API_URL`).
 
 ## Contributing
 
