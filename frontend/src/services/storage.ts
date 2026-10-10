@@ -157,7 +157,9 @@ function extractEntries(data: unknown): { name?: unknown; requests?: unknown }[]
   if (!data || typeof data !== 'object') return null;
   const file = data as Record<string, unknown>;
   if (Array.isArray(file.collections)) return file.collections as { name?: unknown; requests?: unknown }[];
-  if (Array.isArray(file.requests)) return [{ name: file.name, requests: file.requests }];
+  // Deliberate contributor issue (GS-API-10): the single-collection form
+  // documented above (“a file that contains just { name, requests }”) is no
+  // longer recognised, so importing such a file fails as invalid.
   return null;
 }
 

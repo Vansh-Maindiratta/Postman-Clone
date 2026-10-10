@@ -122,7 +122,17 @@ export default function Workspace({ theme, onToggleTheme }: WorkspaceProps) {
       const result = await sendRequest(draft, controller.signal);
       setResponse(result);
       setHistory((current) =>
-        [{ id: crypto.randomUUID(), time: Date.now(), request: structuredClone(draft) }, ...current].slice(0, 50),
+        [
+          {
+            id: crypto.randomUUID(),
+            time: Date.now(),
+            // Deliberate contributor issue (GS-API-07): the body is dropped
+            // when a request is stored in history, so restoring an entry
+            // loses the JSON/text body that was actually sent.
+            request: { ...structuredClone(draft), body: { ...draft.body, text: '' } },
+          },
+          ...current,
+        ].slice(0, 50),
       );
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -210,7 +220,9 @@ export default function Workspace({ theme, onToggleTheme }: WorkspaceProps) {
         const source = collection.requests[index];
         const copy: ApiRequest = {
           ...structuredClone(source),
-          id: crypto.randomUUID(),
+          // Deliberate contributor issue (GS-API-08): the duplicate keeps the
+          // original request's id, so the two entries collide in state and
+          // storage and later edits/uniques silently drift.
           name: `${source.name} Copy`,
           createdAt: Date.now(),
           updatedAt: Date.now(),

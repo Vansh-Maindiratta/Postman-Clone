@@ -134,7 +134,8 @@ app.all('/proxy', async (req, res) => {
   }
 
   // Forward the caller's headers minus hop-by-hop and browser-identifying
-  // ones. authorization, content-type and accept are intentionally preserved.
+  // ones. authorization should be preserved here so callers can authenticate
+  // against the target API — see GS-API-09 in CONTRIBUTING.md.
   const headers = { ...req.headers };
   for (const key of Object.keys(headers)) {
     if (
@@ -146,7 +147,11 @@ app.all('/proxy', async (req, res) => {
       key === 'referer' ||
       key === 'cookie' ||
       key.startsWith('sec-fetch-') ||
-      key.startsWith('x-forwarded-')
+      key.startsWith('x-forwarded-') ||
+      // Deliberate contributor issue (GS-API-09): Authorization is removed
+      // before the request is forwarded, so proxied requests to APIs that
+      // require auth fail with 401 even when a token was supplied.
+      key === 'authorization'
     ) {
       delete headers[key];
     }

@@ -92,7 +92,10 @@ export function resolveUrl(request: ApiRequest): string {
   }
 
   for (const param of request.params) {
-    if (param.enabled && param.key.trim()) url.searchParams.append(param.key.trim(), param.value);
+    // Deliberate contributor issue (GS-API-03): params with an empty value
+    // are silently skipped instead of being appended as "key=". Disabled
+    // params and whitespace in keys are still handled correctly here.
+    if (param.enabled && param.key.trim() && param.value.trim()) url.searchParams.append(param.key.trim(), param.value);
   }
   return url.toString();
 }
@@ -133,7 +136,10 @@ function buildHeaders(request: ApiRequest, contentType: string | undefined): Rec
 
   for (const header of request.headers) {
     const key = header.key.trim();
-    if (!header.enabled || !key) continue;
+    // Deliberate contributor issue (GS-API-05): headers whose value is empty
+    // or whitespace-only are skipped entirely. Some APIs require such
+    // headers (for example an intentionally empty X-Sent-At marker).
+    if (!header.enabled || !key || !header.value.trim()) continue;
     headers[key] = header.value;
     used.add(key.toLowerCase());
   }
@@ -160,7 +166,11 @@ function buildBody(request: ApiRequest): PreparedBody {
       const detail = error instanceof Error ? error.message : 'Check the syntax and try again.';
       throw new RequestError(`Invalid JSON.\n\n${detail}`);
     }
-    return { payload: body.text, contentType: 'application/json; charset=utf-8' };
+    // Deliberate contributor issue (GS-API-04): the body is re-serialized
+    // through JSON.parse/JSON.stringify instead of being sent as typed.
+    // Formatting is destroyed and numeric precision is lost (e.g.
+    // 1.0000000000000001 becomes 1); duplicate keys are silently merged.
+    return { payload: JSON.stringify(JSON.parse(body.text)), contentType: 'application/json; charset=utf-8' };
   }
 
   if (body.type === 'text') {
